@@ -7,10 +7,14 @@ import matplotlib.font_manager as fm
 from scipy import optimize
 from scipy.special import gammaln
 
-# 設定中文字型
+# 設定中文字型（本機 Mac 用 PingFang，雲端環境用備用字型）
+import os
 _font_path = '/System/Library/AssetsV2/com_apple_MobileAsset_Font8/86ba2c91f017a3749571a82f2c6d890ac7ffb2fb.asset/AssetData/PingFang.ttc'
-fm.fontManager.addfont(_font_path)
-plt.rcParams['font.family'] = 'PingFang HK'
+if os.path.exists(_font_path):
+    fm.fontManager.addfont(_font_path)
+    plt.rcParams['font.family'] = 'PingFang HK'
+else:
+    plt.rcParams['font.family'] = ['DejaVu Sans', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
 
 class VT_EGARCH_t:
