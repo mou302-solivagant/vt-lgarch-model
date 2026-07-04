@@ -83,62 +83,141 @@ def interpret_results(ticker, params, h, fc, asset_info):
     current_vol = vol_series[-1]
     mean_vol = vol_series.mean()
 
+    # --- Beta：波動率持續性 ---
     if beta > 0.97:
-        beta_desc = f"**極高持續性（{beta:.4f}）**，波動率衝擊消散非常緩慢，市場情緒一旦改變將持續影響數週。"
+        beta_desc = (
+            f"**極高持續性（{beta:.4f}）**\n\n"
+            f"白話解釋：一旦這個標的出現劇烈波動，這種「震盪狀態」不會很快消失，會延續一段時間才平息，不是一兩天內就結束的類型。\n\n"
+            f"參考區間：多數標的的估計值常落在 0.85～0.95 之間，此數值已超出這個常見範圍。\n\n"
+            f"目前數值代表：波動率一旦被推高，回到平常水準所需的時間統計上會比一般情況更長。"
+        )
     elif beta > 0.93:
-        beta_desc = f"**高持續性（{beta:.4f}）**，波動率具有明顯慣性，今日的高波動往往延續至未來數日。"
+        beta_desc = (
+            f"**高持續性（{beta:.4f}）**\n\n"
+            f"白話解釋：波動一旦出現，會有明顯的延續性，今天的高波動往往會影響到接下來幾天。\n\n"
+            f"參考區間：多數標的的估計值常落在 0.85～0.95 之間，此數值落在區間中上段。\n\n"
+            f"目前數值代表：波動的「慣性」偏強，但仍在常見範圍內。"
+        )
     else:
-        beta_desc = f"**中等持續性（{beta:.4f}）**，波動率會在衝擊後較快回歸正常水準。"
+        beta_desc = (
+            f"**中等持續性（{beta:.4f}）**\n\n"
+            f"白話解釋：波動出現後，會比較快回到平常水準，不會拖太久。\n\n"
+            f"參考區間：多數標的的估計值常落在 0.85～0.95 之間，此數值落在區間中下段或以下。\n\n"
+            f"目前數值代表：波動的延續性相對較弱。"
+        )
+
+    # --- Alpha：衝擊反應 ---
+    if asset_info["allow_diversification_wording"]:
+        alpha_range_note = f"對於{asset_info['label']}這類高度分散的標的，因為持股分散，單一事件的衝擊通常會被稀釋，alpha 常見範圍偏低，約 0.03～0.08。"
+    else:
+        alpha_range_note = "一般個股或非高度分散標的，因為集中曝險在單一公司，alpha 常見範圍約 0.05～0.15。"
 
     if alpha > 0.15:
-        alpha_desc = f"**較強衝擊反應（{alpha:.4f}）**，市場重大事件會顯著推升波動率。"
+        alpha_desc = (
+            f"**較強衝擊反應（{alpha:.4f}）**\n\n"
+            f"白話解釋：遇到重大消息（例如財報、產業新聞、總經事件）時，波動率會被明顯放大，反應比較劇烈。\n\n"
+            f"參考區間：{alpha_range_note}此數值高於常見範圍。\n\n"
+            f"目前數值代表：這個標的對新消息的敏感度統計上偏高。"
+        )
     elif alpha > 0.05:
-        alpha_desc = f"**中等衝擊反應（{alpha:.4f}）**，市場衝擊對波動率有適度影響。"
+        alpha_desc = (
+            f"**中等衝擊反應（{alpha:.4f}）**\n\n"
+            f"白話解釋：新消息對波動率有一定影響，但不算特別劇烈。\n\n"
+            f"參考區間：{alpha_range_note}此數值落在常見範圍內。\n\n"
+            f"目前數值代表：對新資訊的敏感度處於一般水準。"
+        )
     else:
-        alpha_desc = f"**弱衝擊反應（{alpha:.4f}）**，波動率對單次衝擊不太敏感。"
+        alpha_desc = (
+            f"**弱衝擊反應（{alpha:.4f}）**\n\n"
+            f"白話解釋：單一消息對波動率的立即影響不大。\n\n"
+            f"參考區間：{alpha_range_note}此數值低於常見範圍。\n\n"
+            f"目前數值代表：對單次衝擊的敏感度統計上偏低。"
+        )
 
+    # --- Gamma：槓桿效應/不對稱性 ---
     if gamma < -0.05:
-        gamma_desc = f"**存在槓桿效應（{gamma:.4f}）**，股價下跌時波動率放大效果顯著大於上漲，反映投資人下跌時更為恐慌。"
+        gamma_desc = (
+            f"**存在不對稱效應（{gamma:.4f}）**\n\n"
+            f"白話解釋：下跌對波動率的推升幅度，統計上比同樣幅度的上漲更大——也就是跌的時候，波動被放大得更明顯。\n\n"
+            f"參考區間：常見範圍約 -0.3～-0.05，數值越負，這種不對稱性越明顯。\n\n"
+            f"目前數值代表：此標的的波動確實呈現「跌時放大更多」的統計特徵。"
+        )
     elif gamma > 0.05:
-        gamma_desc = f"**反向槓桿效應（{gamma:.4f}）**，股價上漲時波動率反而放大，較為少見。"
+        gamma_desc = (
+            f"**反向不對稱效應（{gamma:.4f}）**\n\n"
+            f"白話解釋：上漲對波動率的推升幅度，統計上比同樣幅度的下跌更大，這種情況比較少見。\n\n"
+            f"參考區間：常見範圍約 -0.3～-0.05（負值居多），此數值為正、且較少見。\n\n"
+            f"目前數值代表：此標的的波動呈現「漲時放大更多」的統計特徵，不是常見型態。"
+        )
     else:
-        gamma_desc = f"**槓桿效應不明顯（{gamma:.4f}）**，漲跌對波動率的影響大致對稱。"
+        gamma_desc = (
+            f"**不對稱效應不明顯（{gamma:.4f}）**\n\n"
+            f"白話解釋：漲跌對波動率的影響幅度統計上差不多，沒有明顯的「跌比漲更劇烈」現象。\n\n"
+            f"參考區間：常見範圍約 -0.3～-0.05，此數值接近 0，落在區間之外（不對稱性弱）。\n\n"
+            f"目前數值代表：這個標的的漲跌波動反應相對對稱。"
+        )
 
+    # --- Nu：尾部風險 ---
     if nu < 6:
-        nu_desc = f"**厚尾特徵顯著（自由度 {nu:.1f}）**，極端報酬出現頻率遠高於常態分佈，需特別注意尾部風險。"
+        nu_range_note = "常見範圍：波動特別劇烈、族群較集中的標的，自由度常落在 3～6 之間。"
+        nu_desc = (
+            f"**厚尾特徵顯著（自由度 {nu:.1f}）**\n\n"
+            f"白話解釋：出現「單日大幅波動」這類極端情況的機率，統計上比常態分布預期的高出許多。\n\n"
+            f"參考區間：{nu_range_note}此數值落在這個範圍內。\n\n"
+            f"目前數值代表：極端波動事件出現的統計機率偏高。"
+        )
     elif nu < 15:
-        nu_desc = f"**中等厚尾（自由度 {nu:.1f}）**，極端事件比常態分佈預期的略多，市場偶有黑天鵝事件。"
+        nu_range_note = "常見範圍：一般標的自由度約落在 6～15 之間。"
+        nu_desc = (
+            f"**中等厚尾（自由度 {nu:.1f}）**\n\n"
+            f"白話解釋：極端波動出現的機率比常態分布略高一些，偶爾會出現超出預期的大幅波動。\n\n"
+            f"參考區間：{nu_range_note}此數值落在這個範圍內。\n\n"
+            f"目前數值代表：極端事件出現的統計機率處於中等水準。"
+        )
     else:
         if asset_info["allow_diversification_wording"]:
-            nu_desc = f"**尾部接近常態（自由度 {nu:.1f}）**，作為{asset_info['label']}標的，極端事件相對溫和，分散化效果良好。"
+            nu_desc = (
+                f"**尾部接近常態（自由度 {nu:.1f}）**\n\n"
+                f"白話解釋：出現極端單日波動的機率，統計上跟常態分布很接近，不算特別容易出現「意外大波動」。\n\n"
+                f"參考區間：追蹤大盤或高度分散的標的，自由度常見會落在 10～20 以上。此數值符合這個範圍。\n\n"
+                f"目前數值代表：作為{asset_info['label']}，其波動結構統計上較接近整體市場的分散特性。"
+            )
         else:
-            nu_desc = f"**尾部接近常態（自由度 {nu:.1f}）**，此模型估計的尾部厚度接近常態分布，極端事件相對溫和。"
+            nu_desc = (
+                f"**尾部接近常態（自由度 {nu:.1f}）**\n\n"
+                f"白話解釋：出現極端單日波動的機率，統計上跟常態分布很接近，不算特別容易出現「意外大波動」。\n\n"
+                f"參考區間：自由度超過 15～20，代表尾部厚度已經很接近常態分布。此數值符合這個範圍。\n\n"
+                f"目前數值代表：此標的的波動結構在統計上偏向溫和，不代表未來不會出現極端事件。"
+            )
 
-    # 依資產類型決定 alpha、nu 段落底下的補充說明，不對個股或未知標的套用分散化話術
-    if asset_info["allow_diversification_wording"]:
-        alpha_note = f"alpha 衡量「新衝擊」對波動率的立即效果。對於{asset_info['label']}這類高度分散的標的，alpha 通常較低，因為分散化已吸收部分個別成分股的衝擊。"
-        nu_note = f"自由度越小，「黑天鵝事件」出現的機率越高。追蹤大盤或高度分散的標的自由度通常較高，反映分散化降低了極端尾部風險。"
-    else:
-        alpha_note = "alpha 衡量「新衝擊」對波動率的立即效果，反映此標的對新資訊的敏感度統計特性。"
-        nu_note = "自由度越小，「黑天鵝事件」出現的機率越高，這是此模型對厚尾程度的統計估計。"
-
+    # --- 目前市場狀態 ---
     vol_ratio = current_vol / mean_vol
     if vol_ratio > 1.3:
-        vol_state = f"⚠️ **目前波動率偏高**（年化 {current_vol:.1f}%，高於歷史均值 {mean_vol:.1f}% 約 {(vol_ratio-1)*100:.0f}%），市場處於相對動盪狀態。"
+        vol_state = (
+            f"⚠️ **目前波動率偏高**（年化 {current_vol:.1f}%，高於歷史均值 {mean_vol:.1f}% 約 {(vol_ratio-1)*100:.0f}%）\n\n"
+            f"白話解釋：目前的波動程度，統計上比這檔標的過去的平均狀態要動盪。"
+        )
     elif vol_ratio < 0.7:
-        vol_state = f"😌 **目前波動率偏低**（年化 {current_vol:.1f}%，低於歷史均值 {mean_vol:.1f}% 約 {(1-vol_ratio)*100:.0f}%），市場相對平靜，但低波動往往孕育高波動。"
+        vol_state = (
+            f"😌 **目前波動率偏低**（年化 {current_vol:.1f}%，低於歷史均值 {mean_vol:.1f}% 約 {(1-vol_ratio)*100:.0f}%）\n\n"
+            f"白話解釋：目前的波動程度，統計上比這檔標的過去的平均狀態要平靜。低波動之後，統計上有時會接著出現波動率回升的情況，這是波動率模型常見的特性，不代表方向。"
+        )
     else:
-        vol_state = f"✅ **目前波動率接近正常水準**（年化 {current_vol:.1f}%，歷史均值 {mean_vol:.1f}%），市場狀態相對穩定。"
+        vol_state = (
+            f"✅ **目前波動率接近正常水準**（年化 {current_vol:.1f}%，歷史均值 {mean_vol:.1f}%）\n\n"
+            f"白話解釋：目前的波動程度跟這檔標的過去的平均狀態相近。"
+        )
 
+    # --- 預測方向 ---
     trend = fc["年化波動率(%)"].iloc[-1] - fc["年化波動率(%)"].iloc[0]
     if trend < -0.5:
-        forecast_desc = f"未來 {len(fc)} 日波動率預測**逐步下降**（{fc['年化波動率(%)'].iloc[0]:.1f}% → {fc['年化波動率(%)'].iloc[-1]:.1f}%），市場有望逐漸回穩。"
+        forecast_desc = f"未來 {len(fc)} 日波動率預測**逐步下降**（{fc['年化波動率(%)'].iloc[0]:.1f}% → {fc['年化波動率(%)'].iloc[-1]:.1f}%）。這是模型對波動程度的統計推估，不代表股價漲跌方向。"
     elif trend > 0.5:
-        forecast_desc = f"未來 {len(fc)} 日波動率預測**持續上升**（{fc['年化波動率(%)'].iloc[0]:.1f}% → {fc['年化波動率(%)'].iloc[-1]:.1f}%），建議留意風險。"
+        forecast_desc = f"未來 {len(fc)} 日波動率預測**持續上升**（{fc['年化波動率(%)'].iloc[0]:.1f}% → {fc['年化波動率(%)'].iloc[-1]:.1f}%）。這是模型對波動程度的統計推估，不代表股價漲跌方向。"
     else:
-        forecast_desc = f"未來 {len(fc)} 日波動率預測**維持平穩**（約 {fc['年化波動率(%)'].mean():.1f}%），短期市場動能變化不大。"
+        forecast_desc = f"未來 {len(fc)} 日波動率預測**維持平穩**（約 {fc['年化波動率(%)'].mean():.1f}%）。這是模型對波動程度的統計推估，不代表股價漲跌方向。"
 
-    return beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc, alpha_note, nu_note
+    return beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc
 
 st.set_page_config(page_title="VT-LGARCH-t", page_icon="📈", layout="wide")
 st.title("📈 VT-LGARCH-t 波動率預測模型")
@@ -185,7 +264,7 @@ if run_btn:
     st.success(f"✅ 模型收斂！{returns.index[0].date()} ~ {returns.index[-1].date()}，樣本數 {len(returns)}")
 
     p = model.params_
-    beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc, alpha_note, nu_note = interpret_results(ticker, p, model.h_, fc, asset_info)
+    beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc = interpret_results(ticker, p, model.h_, fc, asset_info)
 
     # 參數卡片（含 tooltip）
     st.subheader("📊 模型估計結果")
@@ -205,28 +284,25 @@ if run_btn:
 #### 🔵 波動率持續性（beta）
 {beta_desc}
 
-> 當市場出現重大事件（如聯準會升息、地緣政治衝突），高 beta 意味著波動率將持續較長時間，投資人需要更長時間等待市場回穩。
 
 ---
 
 #### 🟡 衝擊反應（alpha）
 {alpha_desc}
 
-> {alpha_note}
+
 
 ---
 
 #### 🔴 槓桿效應（gamma）
 {gamma_desc}
 
-> 這是 EGARCH 相較標準 GARCH 最重要的優勢——能捕捉「恐慌不對稱性」。下跌 2% 對波動率的影響通常大於上漲 2%。
 
 ---
 
 #### 🟣 尾部風險（nu，t分布自由度）
 {nu_desc}
 
-> {nu_note}
 
 ---
 
