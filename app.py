@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from scipy import optimize
 from scipy.special import gammaln
+from asset_classifier import classify_asset
 
 # 設定中文字型（本機 Mac 用 PingFang，雲端環境用備用字型）
 import os
@@ -76,7 +77,7 @@ class VT_EGARCH_t:
         fh = np.array(fh)
         return pd.DataFrame({"天數": np.arange(1, horizon+1), "日波動率(%)": np.sqrt(fh).round(4), "年化波動率(%)": (np.sqrt(fh)*np.sqrt(252)).round(4)})
 
-def interpret_results(ticker, params, h, fc):
+def interpret_results(ticker, params, h, fc, asset_info):
     beta, alpha, gamma, nu = params['beta'], params['alpha'], params['gamma'], params['nu']
     vol_series = np.sqrt(h) * np.sqrt(252)
     current_vol = vol_series[-1]
@@ -108,7 +109,18 @@ def interpret_results(ticker, params, h, fc):
     elif nu < 15:
         nu_desc = f"**中等厚尾（自由度 {nu:.1f}）**，極端事件比常態分佈預期的略多，市場偶有黑天鵝事件。"
     else:
-        nu_desc = f"**尾部接近常態（自由度 {nu:.1f}）**，{ticker} 作為大盤型標的，極端事件相對溫和，分散化效果良好。"
+        if asset_info["allow_diversification_wording"]:
+            nu_desc = f"**尾部接近常態（自由度 {nu:.1f}）**，作為{asset_info['label']}標的，極端事件相對溫和，分散化效果良好。"
+        else:
+            nu_desc = f"**尾部接近常態（自由度 {nu:.1f}）**，此模型估計的尾部厚度接近常態分布，極端事件相對溫和。"
+
+    # 依資產類型決定 alpha、nu 段落底下的補充說明，不對個股或未知標的套用分散化話術
+    if asset_info["allow_diversification_wording"]:
+        alpha_note = f"alpha 衡量「新衝擊」對波動率的立即效果。對於{asset_info['label']}這類高度分散的標的，alpha 通常較低，因為分散化已吸收部分個別成分股的衝擊。"
+        nu_note = f"自由度越小，「黑天鵝事件」出現的機率越高。追蹤大盤或高度分散的標的自由度通常較高，反映分散化降低了極端尾部風險。"
+    else:
+        alpha_note = "alpha 衡量「新衝擊」對波動率的立即效果，反映此標的對新資訊的敏感度統計特性。"
+        nu_note = "自由度越小，「黑天鵝事件」出現的機率越高，這是此模型對厚尾程度的統計估計。"
 
     vol_ratio = current_vol / mean_vol
     if vol_ratio > 1.3:
@@ -126,7 +138,7 @@ def interpret_results(ticker, params, h, fc):
     else:
         forecast_desc = f"未來 {len(fc)} 日波動率預測**維持平穩**（約 {fc['年化波動率(%)'].mean():.1f}%），短期市場動能變化不大。"
 
-    return beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc
+    return beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc, alpha_note, nu_note
 
 st.set_page_config(page_title="VT-LGARCH-t", page_icon="📈", layout="wide")
 st.title("📈 VT-LGARCH-t 波動率預測模型")
@@ -153,11 +165,19 @@ if run_btn:
             if df.empty:
                 st.error(f"找不到 {ticker}")
                 st.stop()
+            try:
+                quote_type = yf.Ticker(ticker).info.get("quoteType")
+            except Exception:
+                quote_type = None
             close = df["Close"].dropna().squeeze()
             returns = (np.log(close / close.shift(1)).dropna() * 100)
             returns.name = "log_return"
             model = VT_EGARCH_t(returns).fit()
             fc = model.forecast(horizon)
+            asset_info = classify_asset(ticker, quote_type)
+        except Exception as e:
+            st.error(f"錯誤：{e}")
+            st.stop()
         except Exception as e:
             st.error(f"錯誤：{e}")
             st.stop()
@@ -165,7 +185,7 @@ if run_btn:
     st.success(f"✅ 模型收斂！{returns.index[0].date()} ~ {returns.index[-1].date()}，樣本數 {len(returns)}")
 
     p = model.params_
-    beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc = interpret_results(ticker, p, model.h_, fc)
+    beta_desc, alpha_desc, gamma_desc, nu_desc, vol_state, forecast_desc, alpha_note, nu_note = interpret_results(ticker, p, model.h_, fc, asset_info)
 
     # 參數卡片（含 tooltip）
     st.subheader("📊 模型估計結果")
@@ -192,7 +212,7 @@ if run_btn:
 #### 🟡 衝擊反應（alpha）
 {alpha_desc}
 
-> alpha 衡量「新衝擊」對波動率的立即效果。對指數型 ETF，alpha 通常比個股低，因為分散化已吸收了部分個股衝擊。
+> {alpha_note}
 
 ---
 
@@ -206,7 +226,7 @@ if run_btn:
 #### 🟣 尾部風險（nu，t分布自由度）
 {nu_desc}
 
-> 自由度越小，「黑天鵝事件」出現的機率越高。追蹤大盤的 ETF 自由度通常較高，反映分散化降低了極端尾部風險。
+> {nu_note}
 
 ---
 
