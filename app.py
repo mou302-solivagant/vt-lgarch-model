@@ -257,9 +257,7 @@ if run_btn:
         except Exception as e:
             st.error(f"錯誤：{e}")
             st.stop()
-        except Exception as e:
-            st.error(f"錯誤：{e}")
-            st.stop()
+        
 
     st.success(f"✅ 模型收斂！{returns.index[0].date()} ~ {returns.index[-1].date()}，樣本數 {len(returns)}")
 
@@ -345,9 +343,18 @@ if run_btn:
         st.dataframe(fc, hide_index=True, use_container_width=True)
     with cb:
         fig3, ax3 = plt.subplots(figsize=(6, 3.5))
-        ax3.bar(fc["天數"], fc["年化波動率(%)"], color="#2ECC71", alpha=0.8)
-        for i, v in enumerate(fc["年化波動率(%)"].values):
-            ax3.text(i+1, v+0.1, f"{v:.1f}%", ha="center", fontsize=9)
+        n_days = len(fc)
+        if n_days <= 10:
+            ax3.bar(fc["天數"], fc["年化波動率(%)"], color="#2ECC71", alpha=0.8)
+            for i, v in enumerate(fc["年化波動率(%)"].values):
+                ax3.text(i+1, v+0.1, f"{v:.1f}%", ha="center", fontsize=9)
+        else:
+            ax3.plot(fc["天數"], fc["年化波動率(%)"], color="#2ECC71", linewidth=2, marker="o", markersize=3)
+            label_step = max(1, n_days // 6)
+            for i in range(0, n_days, label_step):
+                ax3.annotate(f"{fc['年化波動率(%)'].iloc[i]:.1f}%",
+                          (fc["天數"].iloc[i], fc["年化波動率(%)"].iloc[i]),
+                          textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8)
         ax3.set_xlabel("天數"); ax3.set_ylabel("年化波動率 (%)"); ax3.grid(alpha=0.3, axis="y"); fig3.tight_layout()
         st.pyplot(fig3)
 
